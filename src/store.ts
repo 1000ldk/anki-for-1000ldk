@@ -165,3 +165,16 @@ export async function answerCard(card: Card, rating: Rating, now = Date.now(), r
   });
   return result.card;
 }
+
+/** 連続学習日数。今日（まだ学習していなければ昨日）から遡って、1枚以上評価した日が続いている日数 */
+export async function studyStreak(now: number, dayStartHour: number): Promise<number> {
+  let end = nextDayStart(now, dayStartHour);
+  let streak = 0;
+  for (let i = 0; ; i++) {
+    const start = dayStart(end - 1, dayStartHour);
+    const studied = await db.reviewLogs.where('reviewedAt').between(start, end, true, false).first();
+    if (studied) streak++;
+    else if (i > 0) return streak;
+    end = start;
+  }
+}

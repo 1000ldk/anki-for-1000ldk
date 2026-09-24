@@ -13,14 +13,14 @@ const STATE_LABELS: Record<Card['state'], string> = {
 export async function renderDeck(root: HTMLElement, deckId: string): Promise<void> {
   const deck = await getDeck(deckId);
   if (!deck) {
-    root.replaceChildren(header('デッキ', { back: '#/' }), h('main', { class: 'page' }, h('p', { class: 'empty' }, 'デッキが見つかりません')));
+    root.replaceChildren(header('デッキ', { back: '#/' }), h('main', { class: 'container' }, h('p', null, 'デッキが見つかりません')));
     return;
   }
   const cards = await listCards(deckId);
   // 一覧と検索は、画像を「[画像]」に置き換えた文字列で行う
   const plain = new Map(cards.map((c) => [c.id, { front: toPlainText(c.front), back: toPlainText(c.back) }]));
-  const listEl = h('ul', { class: 'card-list' });
-  const countEl = h('p', { class: 'summary' });
+  const listEl = h('section', null);
+  const countEl = h('small', null);
 
   const renderList = (query: string) => {
     const q = query.trim().toLowerCase();
@@ -34,15 +34,9 @@ export async function renderDeck(root: HTMLElement, deckId: string): Promise<voi
     listEl.replaceChildren(
       ...hits.map((c) =>
         h(
-          'li',
-          null,
-          h(
-            'a',
-            { class: 'card-row', href: `#/deck/${deckId}/card/${c.id}` },
-            h('span', { class: 'card-front' }, plain.get(c.id)!.front),
-            h('span', { class: 'card-back' }, plain.get(c.id)!.back),
-            h('span', { class: `badge ${c.state}` }, STATE_LABELS[c.state]),
-          ),
+          'a',
+          { href: `#/deck/${deckId}/card/${c.id}` },
+          h('article', null, h('strong', null, plain.get(c.id)!.front), h('small', null, `${STATE_LABELS[c.state]} ・ ${plain.get(c.id)!.back}`)),
         ),
       ),
     );
@@ -67,21 +61,25 @@ export async function renderDeck(root: HTMLElement, deckId: string): Promise<voi
     header(deck.name, { back: '#/' }),
     h(
       'main',
-      { class: 'page' },
-      h('a', { class: 'btn primary block', href: `#/deck/${deckId}/card/new` }, '＋ カードを追加'),
+      { class: 'container' },
+      h('a', { role: 'button', href: `#/deck/${deckId}/card/new` }, 'カードを追加'),
       h('input', {
-        class: 'search',
         type: 'search',
+        'aria-label': 'カードを検索',
         placeholder: '表・裏のテキストで検索',
         oninput: (e: Event) => renderList((e.target as HTMLInputElement).value),
       }),
-      countEl,
+      h('p', null, countEl),
       listEl,
       h(
-        'div',
-        { class: 'danger-zone' },
-        h('button', { class: 'btn', onclick: rename }, 'デッキ名を変更'),
-        h('button', { class: 'btn danger', onclick: remove }, 'デッキを削除'),
+        'footer',
+        null,
+        h(
+          'div',
+          { role: 'group' },
+          h('button', { class: 'secondary', onclick: rename }, 'デッキ名を変更'),
+          h('button', { class: 'secondary', 'data-danger': true, onclick: remove }, 'デッキを削除'),
+        ),
       ),
     ),
   );

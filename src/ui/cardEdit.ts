@@ -13,7 +13,7 @@ export async function renderCardEdit(root: HTMLElement, deckId: string, cardId: 
   const card = cardId ? await getCard(cardId) : undefined;
   const back = `#/deck/${deckId}`;
   if (!deck || (cardId && !card)) {
-    root.replaceChildren(header('カード', { back }), h('main', { class: 'page' }, h('p', { class: 'empty' }, 'カードが見つかりません')));
+    root.replaceChildren(header('カード', { back }), h('main', { class: 'container' }, h('p', null, 'カードが見つかりません')));
     return () => {};
   }
 
@@ -27,7 +27,7 @@ export async function renderCardEdit(root: HTMLElement, deckId: string, cardId: 
 
   function sideEditor(id: string, label: string, placeholder: string, value: string) {
     const textarea = h('textarea', { id, rows: 4, required: true, placeholder, value });
-    const preview = h('div', { class: 'preview', hidden: true, 'aria-label': `${label}のプレビュー` });
+    const preview = h('section', { class: 'preview', hidden: true, 'aria-label': `${label}のプレビュー` });
     const libraryInput = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true });
     const cameraInput = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
     const replaceInput = h('input', { type: 'file', accept: 'image/*', hidden: true });
@@ -188,7 +188,7 @@ export async function renderCardEdit(root: HTMLElement, deckId: string, cardId: 
       'button',
       {
         type: 'button',
-        class: 'btn small',
+        class: 'secondary',
         onclick: () =>
           actionSheet(null, [
             { label: '写真から選ぶ', run: () => libraryInput.click() },
@@ -199,11 +199,12 @@ export async function renderCardEdit(root: HTMLElement, deckId: string, cardId: 
     );
 
     const el = h(
-      'div',
-      { class: 'side-editor' },
-      h('div', { class: 'side-head' }, h('label', { for: id }, label), imageButton),
+      'article',
+      null,
+      h('label', { for: id }, label),
       textarea,
       preview,
+      imageButton,
       libraryInput,
       cameraInput,
       replaceInput,
@@ -261,15 +262,9 @@ export async function renderCardEdit(root: HTMLElement, deckId: string, cardId: 
     header(card ? 'カードを編集' : 'カードを追加', { back }),
     h(
       'main',
-      { class: 'page' },
-      h(
-        'form',
-        { class: 'card-form', onsubmit: save },
-        frontSide.el,
-        backSide.el,
-        h('button', { class: 'btn primary block', type: 'submit' }, card ? '保存' : '追加して次へ'),
-      ),
-      card && h('div', { class: 'danger-zone' }, h('button', { class: 'btn danger', onclick: remove }, 'カードを削除')),
+      { class: 'container' },
+      h('form', { onsubmit: save }, frontSide.el, backSide.el, h('button', { type: 'submit' }, card ? '保存' : '追加して次へ')),
+      card && h('footer', null, h('button', { class: 'secondary', 'data-danger': true, onclick: remove }, 'カードを削除')),
     ),
   );
   if (!card) frontSide.textarea.focus();

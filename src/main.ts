@@ -1,4 +1,5 @@
-import './style.css';
+import '@picocss/pico/css/pico.zinc.min.css';
+import './styles/app.css';
 import { cleanupMediaDaily } from './media';
 import { bannerHost, setupPwa } from './pwa';
 import { renderCardEdit } from './ui/cardEdit';
@@ -23,7 +24,6 @@ async function route(): Promise<void> {
   const parts = path.split('/').filter(Boolean);
   // 描画中に次の遷移が起きたら、古い描画結果は捨てる
   const target = document.createElement('div');
-  target.className = 'screen';
 
   let result: Cleanup = undefined;
   try {
@@ -35,7 +35,7 @@ async function route(): Promise<void> {
     else await renderHome(target);
   } catch (e) {
     console.error(e);
-    target.replaceChildren(h('main', { class: 'page' }, h('p', { class: 'empty' }, `エラーが発生しました：${e instanceof Error ? e.message : e}`), h('a', { class: 'btn block', href: '#/' }, 'ホームへ')));
+    target.replaceChildren(h('main', { class: 'container' }, h('p', null, `エラーが発生しました：${e instanceof Error ? e.message : e}`), h('a', { role: 'button', class: 'secondary', href: '#/' }, 'ホームへ')));
   }
 
   if (id !== renderId) {
@@ -43,7 +43,7 @@ async function route(): Promise<void> {
     return;
   }
   cleanup = result;
-  const topbar = target.querySelector('.topbar');
+  const topbar = target.querySelector(':scope > header');
   if (topbar) topbar.after(bannerHost);
   else target.prepend(bannerHost);
   root.replaceChildren(target);

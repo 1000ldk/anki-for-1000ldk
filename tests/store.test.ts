@@ -4,7 +4,7 @@ import { AppDB, db, useDatabase } from '../src/db';
 import { nextDayStart } from '../src/day';
 import { DAY, MINUTE } from '../src/scheduler';
 import { StudySession } from '../src/session';
-import { answerCard, createCard, createDeck, deleteDeck, getDeckQueue, updateDeck } from '../src/store';
+import { answerCard, createCard, createDeck, deleteDeck, getDeckQueue, studyStreak, updateDeck } from '../src/store';
 
 const HOUR4 = 4;
 const NOW = new Date(2026, 8, 24, 12, 0).getTime();
@@ -65,6 +65,27 @@ describe('学習キュー', () => {
     await deleteDeck(deck.id);
     expect(await db.cards.count()).toBe(0);
     expect(await db.reviewLogs.count()).toBe(0);
+  });
+});
+
+describe('連続学習日数', () => {
+  it('今日まだ学習していなければ昨日までの連続日数を数え、1日空いたら途切れる', async () => {
+    const deck = await createDeck('英単語', NOW);
+    const cards = [];
+    for (let i = 0; i < 4; i++) cards.push(await createCard(deck.id, `q${i}`, `a${i}`, NOW - 10 * DAY + i));
+    expect(await studyStreak(NOW, HOUR4)).toBe(0);
+
+    // 4日前・2日前・昨日の深夜2時（切り替わり前なので2日前扱い）・昨日
+    await answerCard(cards[0], 3, NOW - 4 * DAY, noFuzz);
+    await answerCard(cards[1], 3, NOW - 2 * DAY, noFuzz);
+    await answerCard(cards[2], 3, new Date(2026, 8, 23, 2, 0).getTime(), noFuzz);
+    await answerCard(cards[3], 3, NOW - DAY, noFuzz);
+    expect(await studyStreak(NOW, HOUR4)).toBe(2);
+
+    // 今日も学習すると3日
+    const again = (await db.cards.get(cards[3].id))!;
+    await answerCard(again, 3, NOW, noFuzz);
+    expect(await studyStreak(NOW, HOUR4)).toBe(3);
   });
 });
 
