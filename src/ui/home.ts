@@ -1,3 +1,4 @@
+import { STORAGE_WARN_RATIO, storageEstimate } from '../media';
 import { DAY } from '../scheduler';
 import { createDeck, getDeckQueue, getSettings, listDecks } from '../store';
 import { h, header, navigate } from './dom';
@@ -6,7 +7,7 @@ export const BACKUP_REMIND_DAYS = 7;
 
 export async function renderHome(root: HTMLElement): Promise<void> {
   const now = Date.now();
-  const [settings, decks] = await Promise.all([getSettings(), listDecks()]);
+  const [settings, decks, storage] = await Promise.all([getSettings(), listDecks(), storageEstimate()]);
   const queues = await Promise.all(decks.map((d) => getDeckQueue(d, now, settings.dayStartHour)));
 
   const addDeck = async () => {
@@ -19,6 +20,8 @@ export async function renderHome(root: HTMLElement): Promise<void> {
   const needsBackup =
     decks.length > 0 && (settings.lastBackupAt === null || now - settings.lastBackupAt >= BACKUP_REMIND_DAYS * DAY);
 
+  const storageRatio = storage ? storage.usage / storage.quota : 0;
+
   const totalDue = queues.reduce((n, q) => n + q.learning.length + q.review.length + q.fresh.length, 0);
 
   root.replaceChildren(
@@ -26,6 +29,12 @@ export async function renderHome(root: HTMLElement): Promise<void> {
     h(
       'main',
       { class: 'page' },
+      storageRatio > STORAGE_WARN_RATIO &&
+        h(
+          'a',
+          { class: 'notice', href: '#/settings' },
+          `保存容量の${Math.round(storageRatio * 100)}%を使っています。バックアップを書き出し、不要な画像を整理してください`,
+        ),
       needsBackup &&
         h(
           'a',

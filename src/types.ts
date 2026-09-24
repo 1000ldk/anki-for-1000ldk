@@ -53,20 +53,41 @@ export interface ReviewLog {
   newEase: number;
 }
 
+/** カードに貼り付けた画像。本文からは `![](media:<id>)` で参照する */
+export interface Media {
+  id: string;
+  /** 処理済み（縮小・再エンコード後）の画像本体 */
+  blob: Blob;
+  mime: MediaMime;
+  width: number;
+  height: number;
+  /** バイト数 */
+  size: number;
+  /** 本体のSHA-256（16進）。同じ画像の重複保存を防ぐ */
+  hash: string;
+  createdAt: number;
+}
+
+export type MediaMime = 'image/jpeg' | 'image/png';
+
 export interface Settings {
   id: 'settings';
   /** 日付の切り替わり時刻（0〜23時） */
   dayStartHour: number;
   lastBackupAt: number | null;
+  /** 不要画像の掃除を最後に実行した日時 */
+  lastMediaCleanupAt: number | null;
   schemaVersion: number;
 }
 
-export const SCHEMA_VERSION = 1;
+/** バックアップ形式のバージョン。2 から画像を含む ZIP 形式 */
+export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 'settings',
   dayStartHour: 4,
   lastBackupAt: null,
+  lastMediaCleanupAt: null,
   schemaVersion: SCHEMA_VERSION,
 };
 

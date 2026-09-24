@@ -57,3 +57,46 @@ export function navigate(hash: string): void {
   if (location.hash === hash) window.dispatchEvent(new HashChangeEvent('hashchange'));
   else location.hash = hash;
 }
+
+export interface SheetAction {
+  label: string;
+  kind?: 'primary' | 'danger';
+  run: () => void;
+}
+
+/** 画面下から出る選択肢。run はタップの中で同期的に呼ぶので、ファイル選択や共有シートも開ける */
+export function actionSheet(message: string | null, actions: SheetAction[], onCancel?: () => void): void {
+  const close = () => {
+    backdrop.remove();
+    window.removeEventListener('hashchange', cancel);
+  };
+  const cancel = () => {
+    close();
+    onCancel?.();
+  };
+  const backdrop = h(
+    'div',
+    { class: 'sheet-backdrop', onclick: (e: Event) => e.target === backdrop && cancel() },
+    h(
+      'div',
+      { class: 'sheet', role: 'dialog' },
+      message && h('p', { class: 'sheet-message' }, message),
+      actions.map((a) =>
+        h(
+          'button',
+          {
+            class: `btn block ${a.kind ?? ''}`,
+            onclick: () => {
+              close();
+              a.run();
+            },
+          },
+          a.label,
+        ),
+      ),
+      h('button', { class: 'btn block', onclick: cancel }, 'キャンセル'),
+    ),
+  );
+  window.addEventListener('hashchange', cancel);
+  document.body.append(backdrop);
+}

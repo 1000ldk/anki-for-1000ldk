@@ -1,3 +1,4 @@
+import { toPlainText } from '../markdown';
 import { deleteDeck, getDeck, listCards, updateDeck } from '../store';
 import type { Card } from '../types';
 import { h, header, navigate, toast } from './dom';
@@ -16,12 +17,19 @@ export async function renderDeck(root: HTMLElement, deckId: string): Promise<voi
     return;
   }
   const cards = await listCards(deckId);
+  // 一覧と検索は、画像を「[画像]」に置き換えた文字列で行う
+  const plain = new Map(cards.map((c) => [c.id, { front: toPlainText(c.front), back: toPlainText(c.back) }]));
   const listEl = h('ul', { class: 'card-list' });
   const countEl = h('p', { class: 'summary' });
 
   const renderList = (query: string) => {
     const q = query.trim().toLowerCase();
-    const hits = q ? cards.filter((c) => c.front.toLowerCase().includes(q) || c.back.toLowerCase().includes(q)) : cards;
+    const hits = q
+      ? cards.filter((c) => {
+          const p = plain.get(c.id)!;
+          return p.front.toLowerCase().includes(q) || p.back.toLowerCase().includes(q);
+        })
+      : cards;
     countEl.textContent = q ? `${hits.length} / ${cards.length} 枚` : `${cards.length} 枚`;
     listEl.replaceChildren(
       ...hits.map((c) =>
@@ -31,8 +39,8 @@ export async function renderDeck(root: HTMLElement, deckId: string): Promise<voi
           h(
             'a',
             { class: 'card-row', href: `#/deck/${deckId}/card/${c.id}` },
-            h('span', { class: 'card-front' }, c.front),
-            h('span', { class: 'card-back' }, c.back),
+            h('span', { class: 'card-front' }, plain.get(c.id)!.front),
+            h('span', { class: 'card-back' }, plain.get(c.id)!.back),
             h('span', { class: `badge ${c.state}` }, STATE_LABELS[c.state]),
           ),
         ),

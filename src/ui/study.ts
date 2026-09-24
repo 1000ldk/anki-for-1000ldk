@@ -1,9 +1,13 @@
 import { nextDayStart } from '../day';
+import { extractMediaIds } from '../media';
 import { formatDelay, previewDelays } from '../scheduler';
 import { LEARN_AHEAD_MS, StudySession } from '../session';
 import { answerCard, getDeck, getDeckQueue, getSettings } from '../store';
 import { RATING_LABELS, type Card, type Rating } from '../types';
 import { h, header, toast } from './dom';
+import { MediaUrls, openImageViewer, renderMarkdown } from './render';
+
+const cardMediaIds = (cards: readonly Card[]) => cards.flatMap((c) => [...extractMediaIds(c.front), ...extractMediaIds(c.back)]);
 
 export async function renderStudy(root: HTMLElement, deckId: string): Promise<() => void> {
   const deck = await getDeck(deckId);
@@ -19,6 +23,30 @@ export async function renderStudy(root: HTMLElement, deckId: string): Promise<()
   let revealed = false;
   let busy = false;
   let waitTimer: number | undefined;
+  /** 描画の世代。非同期の描画中に次の表示が始まったら古い結果は捨てる */
+  let renderToken = 0;
+  const urls = new MediaUrls();
+
+  const face = async (text: string, side: 'front' | 'back') => {
+    const el = h('div', { class: `face ${side}` });
+    el.append(
+      await renderMarkdown(text, urls, {
+        onImageTap: (e, entry) => {
+          // 表面のタップ（答えを表示）にしない
+          e.stopPropagation();
+          openImageViewer(entry);
+        },
+      }),
+    );
+    return el;
+  };
+
+  /** 表示中のカードの裏面と、次に出そうなカードの画像を先読みし、それ以外の画像のURLは解放する */
+  const prefetch = (card: Card) => {
+    const next = session.upcoming(card, 2);
+    urls.retain(cardMediaIds([card, ...next, ...session.learningCards()]));
+    urls.preload(cardMediaIds([card, ...next])).catch(() => {});
+  };
 
   const countsEl = h('div', { class: 'study-counts' });
   const cardEl = h('section', { class: 'study-card', 'aria-live': 'polite' });
@@ -40,14 +68,16 @@ export async function renderStudy(root: HTMLElement, deckId: string): Promise<()
     );
   }
 
-  function show() {
+  async function show() {
     clearTimeout(waitTimer);
+    const token = ++renderToken;
     const t = Date.now();
     current = session.next(t);
     revealed = false;
     renderCounts();
 
     if (!current) {
+      urls.retain(cardMediaIds(session.learningCards()));
       const due = session.nextLearningDue();
       if (due === null || session.isFinished()) {
         cardEl.replaceChildren(h('div', { class: 'done' }, h('p', { class: 'done-title' }, 'おつかれさまでした'), h('p', null, 'このデッキの今日の学習は完了です。')));
@@ -61,21 +91,26 @@ export async function renderStudy(root: HTMLElement, deckId: string): Promise<()
       return;
     }
 
-    cardEl.replaceChildren(h('div', { class: 'face front' }, current.front));
+    const card = current;
+    const front = await face(card.front, 'front');
+    if (token !== renderToken) return;
+    cardEl.replaceChildren(front);
+    cardEl.scrollTop = 0;
     cardEl.onclick = reveal;
     actionsEl.replaceChildren(h('button', { class: 'btn primary block reveal', onclick: reveal }, '答えを表示'));
+    prefetch(card);
   }
 
-  function reveal() {
+  async function reveal() {
     if (!current || revealed) return;
     revealed = true;
+    const card = current;
+    const token = ++renderToken;
     cardEl.onclick = null;
-    cardEl.replaceChildren(
-      h('div', { class: 'face front' }, current.front),
-      h('hr', { class: 'divider' }),
-      h('div', { class: 'face back' }, current.back),
-    );
-    const delays = previewDelays(current, Date.now());
+    const [front, back] = await Promise.all([face(card.front, 'front'), face(card.back, 'back')]);
+    if (token !== renderToken) return;
+    cardEl.replaceChildren(front, h('hr', { class: 'divider' }), back);
+    const delays = previewDelays(card, Date.now());
     actionsEl.replaceChildren(
       h(
         'div',
@@ -119,10 +154,12 @@ export async function renderStudy(root: HTMLElement, deckId: string): Promise<()
   };
   document.addEventListener('keydown', onKey);
 
-  show();
+  await show();
 
   return () => {
     clearTimeout(waitTimer);
+    renderToken++;
     document.removeEventListener('keydown', onKey);
+    urls.dispose();
   };
 }

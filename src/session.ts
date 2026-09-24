@@ -43,6 +43,16 @@ export class StudySession {
     return this.learning[0]?.due ?? null;
   }
 
+  /** この後に出そうなカード（画像の先読み用のおおよその見込み） */
+  upcoming(current: Card | null, count: number): Card[] {
+    return [...this.review, ...this.fresh, ...this.learning].filter((c) => c.id !== current?.id).slice(0, count);
+  }
+
+  /** 今日のうちに再出題される学習中カード */
+  learningCards(): readonly Card[] {
+    return this.learning;
+  }
+
   isFinished(): boolean {
     return !this.learning.length && !this.review.length && !this.fresh.length;
   }

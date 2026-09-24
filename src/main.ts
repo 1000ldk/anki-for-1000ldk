@@ -1,4 +1,5 @@
 import './style.css';
+import { cleanupMediaDaily } from './media';
 import { bannerHost, setupPwa } from './pwa';
 import { renderCardEdit } from './ui/cardEdit';
 import { renderDeck } from './ui/deck';
@@ -28,7 +29,7 @@ async function route(): Promise<void> {
   try {
     if (parts[0] === 'study' && parts[1]) result = await renderStudy(target, parts[1]);
     else if (parts[0] === 'deck' && parts[1] && parts[2] === 'card' && parts[3]) {
-      await renderCardEdit(target, parts[1], parts[3] === 'new' ? null : parts[3]);
+      result = await renderCardEdit(target, parts[1], parts[3] === 'new' ? null : parts[3]);
     } else if (parts[0] === 'deck' && parts[1]) await renderDeck(target, parts[1]);
     else if (parts[0] === 'settings') await renderSettings(target);
     else await renderHome(target);
@@ -52,3 +53,8 @@ async function route(): Promise<void> {
 window.addEventListener('hashchange', route);
 route();
 setupPwa();
+
+// どのカードからも参照されていない画像を、起動時にバックグラウンドで1日1回まで掃除する
+setTimeout(() => {
+  cleanupMediaDaily().catch((e) => console.error('画像の掃除に失敗しました', e));
+}, 3000);
