@@ -330,6 +330,29 @@ select {
   resize: vertical;
   white-space: pre-wrap;
 }
+/* 入力欄の見出しと「画像を追加」ボタン */
+.side-editor {
+  display: flex;
+  flex-direction: column;
+}
+.side-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+.side-head .btn {
+  margin-bottom: 4px;
+}
+.preview {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  font-size: 15px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* ---- 学習 ---- */
 .study {
@@ -367,6 +390,58 @@ select {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* ---- カード本文（Markdown） ---- */
+.face code,
+.preview code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+.media-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+/* 保存済みの幅・高さ（--w, --ratio, aspect-ratio）で読み込み前から領域を確保する。
+   幅は画面幅・元の幅・高さ60%に収まる幅のうち最小 */
+img.media {
+  display: block;
+  max-width: 100%;
+  width: min(100%, var(--w), calc(60dvh * var(--ratio)));
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: zoom-in;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+img.media.thumb {
+  width: min(100%, var(--w), calc(120px * var(--ratio)));
+  cursor: pointer;
+}
+.media.missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  width: 100%;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.media.missing.thumb {
+  min-height: 48px;
+}
+
 .divider {
   border: 0;
   border-top: 1px solid var(--border);
@@ -491,6 +566,67 @@ select {
   color: inherit;
   font-size: 20px;
   cursor: pointer;
+}
+
+/* ---- 画像の全画面表示 ---- */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #000;
+  touch-action: none;
+  overflow: hidden;
+}
+.viewer-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 0 0;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.viewer-close {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  right: calc(8px + env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.2);
+  color: #fff;
+  font-size: 24px;
+}
+
+/* ---- 下から出る選択肢 ---- */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.35);
+}
+.sheet {
+  width: 100%;
+  max-width: 640px;
+  padding: 8px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg);
+}
+.sheet .btn.block {
+  margin: 8px 0;
+}
+.sheet-message {
+  margin: 8px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.hint.warn {
+  color: var(--danger);
 }
 
 #toast {

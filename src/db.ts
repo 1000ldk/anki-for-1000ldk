@@ -1,11 +1,12 @@
 import Dexie, { type Table } from 'dexie';
-import type { Card, Deck, ReviewLog, Settings } from './types';
+import type { Card, Deck, Media, ReviewLog, Settings } from './types';
 
 export class AppDB extends Dexie {
   declare decks: Table<Deck, string>;
   declare cards: Table<Card, string>;
   declare reviewLogs: Table<ReviewLog, string>;
   declare settings: Table<Settings, string>;
+  declare media: Table<Media, string>;
 
   constructor(name = 'anki-for-1000ldk') {
     super(name);
@@ -15,6 +16,10 @@ export class AppDB extends Dexie {
       cards: 'id, deckId, [deckId+due]',
       reviewLogs: 'id, cardId, reviewedAt, [deckId+reviewedAt]',
       settings: 'id',
+    });
+    // v2: 画像を保存する media ストアを追加。既存ストアはそのまま引き継ぐので移すデータはない
+    this.version(2).stores({
+      media: 'id, hash, createdAt',
     });
   }
 }

@@ -1,22 +1,63 @@
-import { exportBackup, importBackup, parseBackup, type BackupData, type ImportMode } from '../backup';
+import {
+  createBackupFile,
+  estimateBackupSize,
+  importBackup,
+  isActivationError,
+  readBackupFile,
+  saveBackupFile,
+  type BackupPackage,
+  type ImportMode,
+} from '../backup';
+import { cleanupMedia, formatBytes, mediaStats, STORAGE_WARN_RATIO, storageEstimate } from '../media';
 import { getSettings, listDecks, updateDeck, updateSettings } from '../store';
-import { h, header, navigate, toast } from './dom';
+import { actionSheet, h, header, navigate, toast } from './dom';
+
+/**
+ * ZIPを作って共有シートで保存する。ZIP作成に時間がかかり、タップ直後の猶予が切れて
+ * 共有シートを開けなかったときは、もう一度タップしてもらうボタンを出す。
+ */
+async function exportWithRetry(): Promise<boolean> {
+  const file = await createBackupFile();
+  try {
+    return await saveBackupFile(file);
+  } catch (e) {
+    if (!isActivationError(e)) throw e;
+  }
+  return new Promise((resolve, reject) => {
+    actionSheet(
+      `書き出す準備ができました（${formatBytes(file.size)}）`,
+      [{ label: '共有シートを開く', kind: 'primary', run: () => saveBackupFile(file).then(resolve, reject) }],
+      () => resolve(false),
+    );
+  });
+}
 
 export async function renderSettings(root: HTMLElement): Promise<void> {
-  const [settings, decks] = await Promise.all([getSettings(), listDecks()]);
-  let pending: BackupData | null = null;
+  const [settings, decks, media, storage, backupSize] = await Promise.all([
+    getSettings(),
+    listDecks(),
+    mediaStats(),
+    storageEstimate(),
+    estimateBackupSize(),
+  ]);
+  let pending: BackupPackage | null = null;
 
   const lastBackup = settings.lastBackupAt ? new Date(settings.lastBackupAt).toLocaleString('ja-JP') : 'まだありません';
 
+  let exporting = false;
   const doExport = async () => {
+    if (exporting) return;
+    exporting = true;
     try {
-      if (await exportBackup()) {
+      if (await exportWithRetry()) {
         toast('書き出しました');
         navigate(location.hash);
       }
     } catch (e) {
       console.error(e);
       toast('書き出しに失敗しました');
+    } finally {
+      exporting = false;
     }
   };
 
@@ -40,10 +81,13 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
     pending = null;
     importButtons.hidden = true;
     if (!file) return;
+    importInfo.textContent = '読み込み中…';
     try {
-      pending = parseBackup(await file.text());
-      const at = pending.exportedAt ? new Date(pending.exportedAt).toLocaleString('ja-JP') : '不明';
-      importInfo.textContent = `${file.name}：デッキ${pending.decks.length}、カード${pending.cards.length}枚（書き出し日時 ${at}）`;
+      pending = await readBackupFile(file);
+      const { data } = pending;
+      const at = data.exportedAt ? new Date(data.exportedAt).toLocaleString('ja-JP') : '不明';
+      const images = pending.media.length ? `、画像${pending.media.length}枚` : '';
+      importInfo.textContent = `${file.name}：デッキ${data.decks.length}、カード${data.cards.length}枚${images}（書き出し日時 ${at}）`;
       importButtons.hidden = false;
     } catch (err) {
       importInfo.textContent = err instanceof Error ? err.message : String(err);
@@ -57,19 +101,31 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       // 全置換の前に、現在のデータを自動で書き出す（このタップの中で共有シートを開く）
       let saved = false;
       try {
-        saved = await exportBackup();
+        saved = await exportWithRetry();
       } catch (e) {
         console.error(e);
       }
       if (!saved && !confirm('現在のデータを書き出せませんでした。書き出さずに置き換えますか？')) return;
     }
     try {
-      const r = await importBackup(pending, mode);
+      const r = await importBackup(pending.data, mode, pending.media);
       toast(mode === 'replace' ? `置き換えました（カード${r.cards}枚）` : `取り込みました（デッキ${r.decks}、カード${r.cards}枚を更新）`);
       navigate('#/');
     } catch (e) {
       console.error(e);
       toast('読み込みに失敗しました');
+    }
+  };
+
+  const doCleanup = async () => {
+    try {
+      const n = await cleanupMedia();
+      await updateSettings({ lastMediaCleanupAt: Date.now() });
+      toast(n ? `使われていない画像を${n}枚削除しました` : '削除できる画像はありませんでした');
+      navigate(location.hash);
+    } catch (e) {
+      console.error(e);
+      toast('削除に失敗しました');
     }
   };
 
@@ -98,12 +154,27 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
         null,
         h('h2', null, 'バックアップ'),
         h('p', { class: 'hint' }, `最後の書き出し：${lastBackup}`),
-        h('button', { class: 'btn primary block', onclick: doExport }, '書き出す（JSON）'),
-        h('p', { class: 'hint' }, '共有シートの「"ファイル"に保存」でiCloud Driveなどに保存してください。'),
+        h('button', { class: 'btn primary block', onclick: doExport }, `書き出す（ZIP・約${formatBytes(backupSize)}）`),
+        h('p', { class: 'hint' }, '共有シートの「"ファイル"に保存」でiCloud Driveなどに保存してください。画像も含まれます。'),
         h('h3', null, '読み込み'),
-        h('input', { type: 'file', accept: 'application/json,.json', onchange: onFile }),
+        h('input', { type: 'file', accept: 'application/zip,.zip,application/json,.json', onchange: onFile }),
+        h('p', { class: 'hint' }, 'ZIP（画像付き）と、以前のJSON形式のどちらも読み込めます。'),
         importInfo,
         importButtons,
+      ),
+      h(
+        'section',
+        null,
+        h('h2', null, '保存容量'),
+        storage &&
+          h(
+            'p',
+            { class: `hint${storage.usage / storage.quota > STORAGE_WARN_RATIO ? ' warn' : ''}` },
+            `使用量 ${formatBytes(storage.usage)} / 上限 ${formatBytes(storage.quota)}（${Math.round((storage.usage / storage.quota) * 100)}%）`,
+          ),
+        h('p', { class: 'hint' }, `画像 ${media.count}枚・合計 ${formatBytes(media.bytes)}`),
+        h('button', { class: 'btn block', onclick: doCleanup }, '使われていない画像を削除'),
+        h('p', { class: 'hint' }, 'どのカードにも使われていない画像を消します（追加から24時間以内のものは残します）。起動時にも1日1回自動で行います。'),
       ),
       h(
         'section',
