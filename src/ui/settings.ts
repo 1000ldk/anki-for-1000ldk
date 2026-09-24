@@ -61,16 +61,16 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
     }
   };
 
-  const importInfo = h('p', { class: 'hint' });
+  const importInfo = h('p', null);
   const importButtons = h(
-    'div',
-    { class: 'import-panel', hidden: true },
-    h('p', { class: 'hint' }, 'マージ：IDが同じなら更新日時が新しい方を残す／全置換：今のデータを捨てて置き換える'),
+    'section',
+    { hidden: true },
+    h('p', null, h('small', null, 'マージ：IDが同じなら更新日時が新しい方を残す／全置換：今のデータを捨てて置き換える')),
     h(
       'div',
-      { class: 'import-actions' },
-      h('button', { class: 'btn', onclick: () => doImport('merge') }, 'マージ'),
-      h('button', { class: 'btn danger', onclick: () => doImport('replace') }, '全置換'),
+      { role: 'group' },
+      h('button', { class: 'secondary', onclick: () => doImport('merge') }, 'マージ'),
+      h('button', { class: 'secondary', 'data-danger': true, onclick: () => doImport('replace') }, '全置換'),
     ),
   );
 
@@ -144,61 +144,73 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
     toast('保存しました');
   };
 
+  const hint = (text: string) => h('p', null, h('small', null, text));
+  const storageRatio = storage ? storage.usage / storage.quota : 0;
+
   root.replaceChildren(
     header('設定', { back: '#/' }),
     h(
       'main',
-      { class: 'page settings' },
+      { class: 'container' },
       h(
-        'section',
+        'article',
         null,
-        h('h2', null, 'バックアップ'),
-        h('p', { class: 'hint' }, `最後の書き出し：${lastBackup}`),
-        h('button', { class: 'btn primary block', onclick: doExport }, `書き出す（ZIP・約${formatBytes(backupSize)}）`),
-        h('p', { class: 'hint' }, '共有シートの「"ファイル"に保存」でiCloud Driveなどに保存してください。画像も含まれます。'),
-        h('h3', null, '読み込み'),
-        h('input', { type: 'file', accept: 'application/zip,.zip,application/json,.json', onchange: onFile }),
-        h('p', { class: 'hint' }, 'ZIP（画像付き）と、以前のJSON形式のどちらも読み込めます。'),
+        h('header', null, h('h2', null, 'バックアップ')),
+        hint(`最後の書き出し：${lastBackup}`),
+        h('button', { onclick: doExport }, `書き出す（ZIP・約${formatBytes(backupSize)}）`),
+        hint('共有シートの「"ファイル"に保存」でiCloud Driveなどに保存してください。画像も含まれます。'),
+        h(
+          'label',
+          null,
+          '読み込み',
+          h('input', { type: 'file', accept: 'application/zip,.zip,application/json,.json', onchange: onFile }),
+          h('small', null, 'ZIP（画像付き）と、以前のJSON形式のどちらも読み込めます。'),
+        ),
         importInfo,
         importButtons,
       ),
       h(
-        'section',
+        'article',
         null,
-        h('h2', null, '保存容量'),
+        h('header', null, h('h2', null, '保存容量')),
         storage &&
           h(
             'p',
-            { class: `hint${storage.usage / storage.quota > STORAGE_WARN_RATIO ? ' warn' : ''}` },
-            `使用量 ${formatBytes(storage.usage)} / 上限 ${formatBytes(storage.quota)}（${Math.round((storage.usage / storage.quota) * 100)}%）`,
+            null,
+            h('progress', { value: storage.usage, max: storage.quota }),
+            h(
+              'small',
+              { 'data-danger': storageRatio > STORAGE_WARN_RATIO },
+              `使用量 ${formatBytes(storage.usage)} / 上限 ${formatBytes(storage.quota)}（${Math.round(storageRatio * 100)}%）`,
+            ),
           ),
-        h('p', { class: 'hint' }, `画像 ${media.count}枚・合計 ${formatBytes(media.bytes)}`),
-        h('button', { class: 'btn block', onclick: doCleanup }, '使われていない画像を削除'),
-        h('p', { class: 'hint' }, 'どのカードにも使われていない画像を消します（追加から24時間以内のものは残します）。起動時にも1日1回自動で行います。'),
+        hint(`画像 ${media.count}枚・合計 ${formatBytes(media.bytes)}`),
+        h('button', { class: 'secondary', onclick: doCleanup }, '使われていない画像を削除'),
+        hint('どのカードにも使われていない画像を消します（追加から24時間以内のものは残します）。起動時にも1日1回自動で行います。'),
       ),
       h(
-        'section',
+        'article',
         null,
-        h('h2', null, '1日の新規カード上限'),
+        h('header', null, h('h2', null, '1日の新規カード上限')),
         decks.length === 0
-          ? h('p', { class: 'hint' }, 'デッキがありません')
+          ? hint('デッキがありません')
           : decks.map((d) =>
               h(
                 'label',
-                { class: 'row' },
-                h('span', null, d.name),
+                null,
+                d.name,
                 h('input', { type: 'number', inputmode: 'numeric', min: 0, max: 9999, value: d.newPerDay, onchange: onNewPerDay(d.id) }),
               ),
             ),
       ),
       h(
-        'section',
+        'article',
         null,
-        h('h2', null, '日付の切り替わり時刻'),
+        h('header', null, h('h2', null, '日付の切り替わり時刻')),
         h(
           'label',
-          { class: 'row' },
-          h('span', null, 'この時刻までの学習は前日扱い'),
+          null,
+          'この時刻までの学習は前日扱い',
           h(
             'select',
             { onchange: onDayStart },
@@ -206,7 +218,7 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
           ),
         ),
       ),
-      h('p', { class: 'hint version' }, `v${__APP_VERSION__}`),
+      h('p', null, h('small', null, `v${__APP_VERSION__}`)),
     ),
   );
 }

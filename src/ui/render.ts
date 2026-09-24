@@ -116,8 +116,8 @@ export async function renderMarkdown(text: string, urls: MediaUrls, opts: Render
 
   const frag = document.createDocumentFragment();
   for (const b of blocks) {
-    if (b.type === 'images') frag.append(h('div', { class: 'media-row' }, b.images.map(image)));
-    else frag.append(h('div', { class: 'md-text' }, inline(b.inlines)));
+    if (b.type === 'images') frag.append(h('p', null, b.images.map(image)));
+    else frag.append(h('p', null, inline(b.inlines)));
   }
   return frag;
 }
@@ -169,15 +169,10 @@ export function onLongPress(el: HTMLElement, run: () => void): void {
   }, { capture: true });
 }
 
-/** 画像の全画面表示。ピンチで拡大、1本指で移動、タップで閉じる */
+/** 画像の全画面表示（<dialog>）。ピンチで拡大、1本指で移動、タップで閉じる */
 export function openImageViewer(entry: MediaEntry, alt = ''): void {
-  const img = h('img', { class: 'viewer-img', src: entry.url, alt, draggable: 'false' });
-  const overlay = h(
-    'div',
-    { class: 'viewer', role: 'dialog', 'aria-label': '画像の拡大表示' },
-    img,
-    h('button', { class: 'viewer-close', 'aria-label': '閉じる' }, '×'),
-  );
+  const img = h('img', { src: entry.url, alt, draggable: 'false' });
+  const overlay = h('dialog', { class: 'viewer', 'aria-label': '画像の拡大表示' }, img, h('button', { class: 'secondary' }, '閉じる'));
 
   // 画面座標 = t + s × 画像内の座標（transform-origin は左上）
   let s = 1;
@@ -246,12 +241,21 @@ export function openImageViewer(entry: MediaEntry, alt = ''): void {
     e.stopPropagation();
     if (e.key === 'Escape') close();
   };
+  let closed = false;
   function close() {
+    if (closed) return;
+    closed = true;
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('hashchange', close);
+    overlay.close();
     overlay.remove();
   }
+  overlay.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    close();
+  });
   document.addEventListener('keydown', onKey, true);
   window.addEventListener('hashchange', close);
   document.body.append(overlay);
+  overlay.showModal();
 }

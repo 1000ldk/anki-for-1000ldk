@@ -29,13 +29,18 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
+/** 画面上部のバー。左に戻る、中央にタイトル、右に操作を置く */
 export function header(title: string, opts: { back?: string; action?: Node } = {}): HTMLElement {
   return h(
     'header',
-    { class: 'topbar' },
-    opts.back ? h('a', { class: 'topbar-back', href: opts.back, 'aria-label': '戻る' }, '‹') : h('span', { class: 'topbar-back' }),
-    h('h1', null, title),
-    opts.action ?? h('span', { class: 'topbar-action' }),
+    null,
+    h(
+      'nav',
+      null,
+      h('ul', null, h('li', null, opts.back && h('a', { href: opts.back }, '戻る'))),
+      h('ul', null, h('li', null, h('strong', null, title))),
+      h('ul', null, h('li', null, opts.action)),
+    ),
   );
 }
 
@@ -44,7 +49,7 @@ let toastTimer: number | undefined;
 export function toast(message: string): void {
   let el = document.getElementById('toast');
   if (!el) {
-    el = h('div', { id: 'toast', role: 'status' });
+    el = h('output', { id: 'toast' });
     document.body.append(el);
   }
   el.textContent = message;
@@ -64,28 +69,37 @@ export interface SheetAction {
   run: () => void;
 }
 
-/** 画面下から出る選択肢。run はタップの中で同期的に呼ぶので、ファイル選択や共有シートも開ける */
+/** 選択肢のダイアログ。run はタップの中で同期的に呼ぶので、ファイル選択や共有シートも開ける */
 export function actionSheet(message: string | null, actions: SheetAction[], onCancel?: () => void): void {
   const close = () => {
-    backdrop.remove();
     window.removeEventListener('hashchange', cancel);
+    dialog.close();
+    dialog.remove();
   };
   const cancel = () => {
     close();
     onCancel?.();
   };
-  const backdrop = h(
-    'div',
-    { class: 'sheet-backdrop', onclick: (e: Event) => e.target === backdrop && cancel() },
+  const dialog = h(
+    'dialog',
+    {
+      // 枠の外（背景）をタップしたら閉じる
+      onclick: (e: Event) => e.target === dialog && cancel(),
+      oncancel: (e: Event) => {
+        e.preventDefault();
+        cancel();
+      },
+    },
     h(
-      'div',
-      { class: 'sheet', role: 'dialog' },
-      message && h('p', { class: 'sheet-message' }, message),
+      'article',
+      null,
+      message && h('p', null, message),
       actions.map((a) =>
         h(
           'button',
           {
-            class: `btn block ${a.kind ?? ''}`,
+            class: a.kind === 'primary' ? null : 'secondary',
+            'data-danger': a.kind === 'danger',
             onclick: () => {
               close();
               a.run();
@@ -94,9 +108,10 @@ export function actionSheet(message: string | null, actions: SheetAction[], onCa
           a.label,
         ),
       ),
-      h('button', { class: 'btn block', onclick: cancel }, 'キャンセル'),
+      h('button', { class: 'secondary', onclick: cancel }, 'キャンセル'),
     ),
   );
   window.addEventListener('hashchange', cancel);
-  document.body.append(backdrop);
+  document.body.append(dialog);
+  dialog.showModal();
 }

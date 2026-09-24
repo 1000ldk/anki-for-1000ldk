@@ -1,7 +1,7 @@
 import { h } from './ui/dom';
 
 /** 通知の置き場所。画面を描画するたびに上部バーの直下へ差し込む（main.ts） */
-export const bannerHost = h('div', { class: 'banners' });
+export const bannerHost = h('section', { class: 'banners', 'aria-label': 'お知らせ' });
 
 function isStandalone(): boolean {
   return (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches;
@@ -9,11 +9,11 @@ function isStandalone(): boolean {
 
 function banner(text: string, action?: { label: string; run: () => void }, dismissible = true): HTMLElement {
   const el = h(
-    'div',
-    { class: 'banner', role: 'status' },
-    h('span', null, text),
-    action && h('button', { class: 'btn small primary', onclick: action.run }, action.label),
-    dismissible && h('button', { class: 'banner-close', 'aria-label': '閉じる', onclick: () => el.remove() }, '×'),
+    'article',
+    { role: 'status' },
+    h('p', null, text),
+    action && h('button', { onclick: action.run }, action.label),
+    dismissible && h('button', { class: 'secondary', onclick: () => el.remove() }, '閉じる'),
   );
   bannerHost.append(el);
   return el;
