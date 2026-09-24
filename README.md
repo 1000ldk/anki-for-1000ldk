@@ -1,0 +1,1 @@
+# anki-for-1000ldk
